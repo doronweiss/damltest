@@ -1,0 +1,9 @@
+module Setup where
+
+import Daml.Script
+
+import Main
+
+initialize : Script ()
+initialize = do
+  pure ()

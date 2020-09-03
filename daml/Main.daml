@@ -1,0 +1,70 @@
+module Main where
+
+data Cash = Cash with
+  currency : Text
+  amount : Decimal
+    deriving (Eq, Show)
+
+template Iou
+  with
+    issuer : Party
+    owner : Party
+    cash : Cash
+  where
+    signatory issuer, owner
+    controller owner can
+      Transfer
+        : ContractId Iou
+        with
+          newOwner : Party
+        do
+          assertMsg "newOwner cannot be equal to owner." (owner /=newOwner)
+          create this with
+            owner = newOwner
+
+template IouProposal
+  with
+    iou : Iou
+  where
+    signatory iou.issuer
+    controller iou.owner can
+      IouProposal_Accept
+        : ContractId Iou
+        do
+          create iou
+
+template IouTransferProposal with
+    iou : Iou
+    newOwner : Party
+  where
+    signatory (signatory iou)
+    
+    controller iou.owner can  
+      IouTransferProposal_Cancel  
+        : ContractId Iou  
+          do
+            create iou
+    controller newOwner can 
+      IouTransferProposal_Reject      : ContractId Iou
+        do
+          create iou
+      IouTransferProposal_Accept   : ContractId Iou
+        do
+          create iou with
+            owner = newOwner
+
+test = scenario do
+  alice <- getParty "alice"
+  bob <- getParty "bob"
+  do
+    iouprop <- submit alice do
+      create IouProposal with
+        iou = Iou with
+          issuer = alice
+          owner = bob
+          cash = Cash with
+            amount = 100.0
+            currency = "USD"
+    -- However, she can't transfer it to Bob.
+    submit bob do
+      exercise iouprop IouProposal_Accept
